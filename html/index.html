@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nginx HTTP/3 Docker Image</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 3rem;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 10px;
+        }
+        .status {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(0, 255, 0, 0.2);
+            border-radius: 10px;
+        }
+        .protocol {
+            font-family: monospace;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Nginx HTTP/3 Docker Image</h1>
+        <p>Welcome to the high-performance Nginx HTTP/3 Docker image!</p>
+        
+        <div class="features">
+            <div class="feature">
+                <h3>HTTP/3 & QUIC</h3>
+                <p>Latest HTTP/3 protocol support with Cloudflare's quiche</p>
+            </div>
+            <div class="feature">
+                <h3>Modern Compression</h3>
+                <p>Brotli, Zstd, and gzip compression for optimal performance</p>
+            </div>
+            <div class="feature">
+                <h3>GeoIP2 Integration</h3>
+                <p>Geographic IP detection and blocking capabilities</p>
+            </div>
+            <div class="feature">
+                <h3>Multi-Platform</h3>
+                <p>Supports both linux/amd64 and linux/arm64 architectures</p>
+            </div>
+        </div>
+        
+        <div class="status">
+            <h3>Connection Status</h3>
+            <p class="protocol">
+                Protocol: <span id="protocol">Checking...</span><br>
+                Compression: <span id="compression">Checking...</span>
+            </p>
+        </div>
+        
+        <p>
+            <a href="/health" style="color: #00ff88;">Health Check</a> | 
+            <a href="/nginx_status" style="color: #00ff88;">Status Page</a>
+        </p>
+    </div>
+
+    <script>
+        // Detect connection protocol
+        function detectProtocol() {
+            const protocol = window.location.protocol;
+            const isHTTPS = protocol === 'https:';
+            const isHTTP3 = navigator.connection && navigator.connection.effectiveType;
+            
+            let protocolText = isHTTPS ? 'HTTPS' : 'HTTP';
+            if (window.performance && window.performance.getEntriesByType) {
+                const navigation = window.performance.getEntriesByType('navigation')[0];
+                if (navigation && navigation.nextHopProtocol) {
+                    protocolText = navigation.nextHopProtocol.toUpperCase();
+                }
+            }
+            
+            document.getElementById('protocol').textContent = protocolText;
+        }
+
+        // Detect compression
+        function detectCompression() {
+            fetch(window.location.href, {
+                method: 'HEAD'
+            }).then(response => {
+                const encoding = response.headers.get('content-encoding');
+                document.getElementById('compression').textContent = encoding || 'none';
+            }).catch(() => {
+                document.getElementById('compression').textContent = 'unknown';
+            });
+        }
+
+        detectProtocol();
+        detectCompression();
+    </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  nginx-saru:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NGINX_VERSION=${NGINX_VERSION:-1.27.2}
+        - QUICHE_COMMIT=${QUICHE_COMMIT:-0.22.0}
+        - NGX_BROTLI_COMMIT=${NGX_BROTLI_COMMIT:-1.0.0rc}
+        - NGX_ZSTD_TAG=${NGX_ZSTD_TAG:-v0.2.0}
+        - NGX_GEOIP2_TAG=${NGX_GEOIP2_TAG:-3.4}
+        - NGX_HEADERS_MORE_TAG=${NGX_HEADERS_MORE_TAG:-v0.37}
+        - ALPINE_VERSION=${ALPINE_VERSION:-3.20}
+    container_name: nginx-saru
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3 QUIC
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./logs:/var/log/nginx
+      - ./html:/var/www/html:ro
+      - ./geoip:/etc/nginx/geoip:ro
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+    restart: unless-stopped
+    networks:
+      - nginx-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: GeoIP database updater
+  geoip-updater:
+    image: maxmindinc/geoipupdate:latest
+    container_name: geoip-updater
+    environment:
+      - GEOIPUPDATE_ACCOUNT_ID=${GEOIPUPDATE_ACCOUNT_ID:-}
+      - GEOIPUPDATE_LICENSE_KEY=${GEOIPUPDATE_LICENSE_KEY:-}
+      - GEOIPUPDATE_EDITION_IDS=GeoLite2-City GeoLite2-Country
+      - GEOIPUPDATE_FREQUENCY=168  # Update weekly
+    volumes:
+      - ./geoip:/usr/share/GeoIP
+    networks:
+      - nginx-network
+    profiles:
+      - geoip
+
+networks:
+  nginx-network:
+    driver: bridge
+
+volumes:
+  nginx-logs:
+  nginx-certs:
+  geoip-data:

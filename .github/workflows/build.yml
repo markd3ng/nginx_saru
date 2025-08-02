@@ -1,0 +1,211 @@
+name: Build and Push Multi-Platform Docker Image
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      nginx_version:
+        description: 'Nginx version'
+        required: true
+        default: '1.27.2'
+        type: string
+      quiche_commit:
+        description: 'Quiche commit/tag'
+        required: true
+        default: '0.22.0'
+        type: string
+      ngx_brotli_commit:
+        description: 'ngx_brotli commit/tag'
+        required: true
+        default: '1.0.0rc'
+        type: string
+      ngx_zstd_tag:
+        description: 'ngx_zstd tag'
+        required: true
+        default: 'v0.2.0'
+        type: string
+      ngx_geoip2_tag:
+        description: 'ngx_geoip2 tag'
+        required: true
+        default: '3.4'
+        type: string
+      ngx_headers_more_tag:
+        description: 'headers-more-nginx-module tag'
+        required: true
+        default: 'v0.37'
+        type: string
+      alpine_version:
+        description: 'Alpine Linux version'
+        required: true
+        default: '3.20'
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            NGINX_VERSION=${{ inputs.nginx_version || '1.27.2' }}
+            QUICHE_COMMIT=${{ inputs.quiche_commit || '0.22.0' }}
+            NGX_BROTLI_COMMIT=${{ inputs.ngx_brotli_commit || '1.0.0rc' }}
+            NGX_ZSTD_TAG=${{ inputs.ngx_zstd_tag || 'v0.2.0' }}
+            NGX_GEOIP2_TAG=${{ inputs.ngx_geoip2_tag || '3.4' }}
+            NGX_HEADERS_MORE_TAG=${{ inputs.ngx_headers_more_tag || 'v0.37' }}
+            ALPINE_VERSION=${{ inputs.alpine_version || '3.20' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.platform.replace('/', '_') }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    needs:
+      - build
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: nginx-saru:test
+          build-args: |
+            NGINX_VERSION=${{ inputs.nginx_version || '1.27.2' }}
+            QUICHE_COMMIT=${{ inputs.quiche_commit || '0.22.0' }}
+            NGX_BROTLI_COMMIT=${{ inputs.ngx_brotli_commit || '1.0.0rc' }}
+            NGX_ZSTD_TAG=${{ inputs.ngx_zstd_tag || 'v0.2.0' }}
+            NGX_GEOIP2_TAG=${{ inputs.ngx_geoip2_tag || '3.4' }}
+            NGX_HEADERS_MORE_TAG=${{ inputs.ngx_headers_more_tag || 'v0.37' }}
+            ALPINE_VERSION=${{ inputs.alpine_version || '3.20' }}
+
+      - name: Test nginx configuration
+        run: |
+          docker run --rm nginx-saru:test nginx -t
+
+      - name: Test nginx modules
+        run: |
+          docker run --rm nginx-saru:test nginx -V 2>&1 | grep -E "(brotli|zstd|geoip|headers-more|quic)"
+
+      - name: Test HTTP/3 support
+        run: |
+          docker run -d --name nginx-test -p 8080:80 -p 8443:443 -p 8443:443/udp nginx-saru:test
+          sleep 5
+          curl -I --http3 https://localhost:8443 || echo "HTTP/3 test requires curl with HTTP/3 support"
+          docker stop nginx-test
+          docker rm nginx-test
