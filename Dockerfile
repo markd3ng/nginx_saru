@@ -100,7 +100,6 @@ RUN ./configure \
     --with-stream_ssl_module \
     --with-stream_ssl_preread_module \
     --with-threads \
-    --with-stream \
     --with-stream_ssl_module \
     --with-stream_realip_module \
     --with-stream_geoip_module=dynamic \
@@ -113,13 +112,12 @@ RUN ./configure \
     --with-cc-opt="-I../quiche/include -I../quiche/deps/boringssl/include" \
     --with-ld-opt="-L../quiche/target/release -Wl,-rpath,/usr/local/lib" \
     --with-openssl=../quiche/deps/boringssl \
-    --with-quiche=../quiche \\
-    --with-http_v3_module \
+    --with-quiche=../quiche \
     --with-http_quic_module \
     --with-stream_quic_module \
     --with-debug \
     --with-pcre-jit \
-    --with-zlib-opt=\"--with-zlib=../quiche/deps/zlib\" \
+    --with-zlib-opt="--with-zlib=../quiche/deps/zlib" \
     && make -j$(nproc) \
     && make install
 
