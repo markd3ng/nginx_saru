@@ -3,7 +3,7 @@ ARG ALPINE_VERSION=3.20
 FROM alpine:${ALPINE_VERSION} AS build-stage
 
 ARG NGINX_VERSION=1.27.2
-ARG QUICHE_VERSION=0.22.0
+ARG QUICHE_VERSION=0.24.4
 ARG NGX_BROTLI_VERSION=1.0.0rc
 ARG NGX_ZSTD_VERSION=v0.2.0
 ARG NGX_GEOIP2_VERSION=3.4
@@ -29,11 +29,11 @@ RUN apk add --no-cache \
 
 WORKDIR /src
 
-# Build quiche
-RUN git clone --depth=1 --recursive https://github.com/cloudflare/quiche.git && \
+# Download and build quiche
+RUN curl -fSL "https://github.com/cloudflare/quiche/archive/refs/tags/${QUICHE_VERSION}.tar.gz" -o quiche.tar.gz && \
+    tar -zxC /src -f quiche.tar.gz && \
+    mv "quiche-${QUICHE_VERSION}" quiche && \
     cd quiche && \
-    git checkout ${QUICHE_VERSION} && \
-    git submodule update --init --recursive && \
     export PATH="$HOME/.cargo/bin:$PATH" && \
     cargo build --release --no-default-features --features ffi,ssl
 
@@ -42,16 +42,31 @@ RUN curl -fSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" -o ngin
     tar -zxC /src -f nginx.tar.gz && \
     mv "nginx-${NGINX_VERSION}" nginx
 
-# Clone modules
-RUN git clone --depth=1 --branch ${NGX_BROTLI_VERSION} https://github.com/google/ngx_brotli.git && \
+# Download modules
+RUN curl -fSL "https://github.com/google/ngx_brotli/archive/refs/tags/${NGX_BROTLI_VERSION}.tar.gz" -o ngx_brotli.tar.gz && \
+    tar -zxC /src -f ngx_brotli.tar.gz && \
+    mv "ngx_brotli-${NGX_BROTLI_VERSION}" ngx_brotli && \
+    rm ngx_brotli.tar.gz && \
     cd ngx_brotli && \
-    git submodule update --init --depth 1 --recursive
+    curl -fSL "https://github.com/google/brotli/archive/refs/heads/master.tar.gz" -o brotli.tar.gz && \
+    tar -zxC deps -f brotli.tar.gz && \
+    mv deps/brotli-* deps/brotli && \
+    rm brotli.tar.gz
 
-RUN git clone --depth=1 --branch ${NGX_ZSTD_VERSION} https://github.com/tokers/ngx_http_zstd_filter_module.git
+RUN curl -fSL "https://github.com/tokers/ngx_http_zstd_filter_module/archive/refs/tags/${NGX_ZSTD_VERSION}.tar.gz" -o ngx_zstd.tar.gz && \
+    tar -zxC /src -f ngx_zstd.tar.gz && \
+    mv "ngx_http_zstd_filter_module-${NGX_ZSTD_VERSION#v}" ngx_http_zstd_filter_module && \
+    rm ngx_zstd.tar.gz
 
-RUN git clone --depth=1 --branch ${NGX_GEOIP2_VERSION} https://github.com/leev/ngx_http_geoip2_module.git
+RUN curl -fSL "https://github.com/leev/ngx_http_geoip2_module/archive/refs/tags/${NGX_GEOIP2_VERSION}.tar.gz" -o ngx_geoip2.tar.gz && \
+    tar -zxC /src -f ngx_geoip2.tar.gz && \
+    mv "ngx_http_geoip2_module-${NGX_GEOIP2_VERSION}" ngx_http_geoip2_module && \
+    rm ngx_geoip2.tar.gz
 
-RUN git clone --depth=1 --branch ${NGX_HEADERS_MORE_VERSION} https://github.com/openresty/headers-more-nginx-module.git
+RUN curl -fSL "https://github.com/openresty/headers-more-nginx-module/archive/refs/tags/${NGX_HEADERS_MORE_VERSION}.tar.gz" -o headers_more.tar.gz && \
+    tar -zxC /src -f headers_more.tar.gz && \
+    mv "headers-more-nginx-module-${NGX_HEADERS_MORE_VERSION#v}" headers-more-nginx-module && \
+    rm headers_more.tar.gz
 
 # Configure and build nginx
 WORKDIR /src/nginx
