@@ -3,11 +3,11 @@ ARG ALPINE_VERSION=3.20
 FROM alpine:${ALPINE_VERSION} AS build-stage
 
 ARG NGINX_VERSION=1.27.2
-ARG QUICHE_COMMIT=0.22.0
-ARG NGX_BROTLI_COMMIT=1.0.0rc
-ARG NGX_ZSTD_TAG=v0.2.0
-ARG NGX_GEOIP2_TAG=3.4
-ARG NGX_HEADERS_MORE_TAG=v0.37
+ARG QUICHE_VERSION=0.22.0
+ARG NGX_BROTLI_VERSION=1.0.0rc
+ARG NGX_ZSTD_VERSION=v0.2.0
+ARG NGX_GEOIP2_VERSION=3.4
+ARG NGX_HEADERS_MORE_VERSION=v0.37
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -30,8 +30,9 @@ RUN apk add --no-cache \
 WORKDIR /src
 
 # Build quiche
-RUN git clone --depth=1 --branch ${QUICHE_COMMIT} https://github.com/cloudflare/quiche.git && \
+RUN git clone --depth=1 --recursive https://github.com/cloudflare/quiche.git && \
     cd quiche && \
+    git checkout ${QUICHE_VERSION} && \
     cargo build --release --no-default-features --features ffi,ssl
 
 # Download nginx
@@ -40,15 +41,15 @@ RUN curl -fSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" -o ngin
     mv "nginx-${NGINX_VERSION}" nginx
 
 # Clone modules
-RUN git clone --depth=1 --branch ${NGX_BROTLI_COMMIT} https://github.com/google/ngx_brotli.git && \
+RUN git clone --depth=1 --branch ${NGX_BROTLI_VERSION} https://github.com/google/ngx_brotli.git && \
     cd ngx_brotli && \
     git submodule update --init --depth 1 --recursive
 
-RUN git clone --depth=1 --branch ${NGX_ZSTD_TAG} https://github.com/tokers/ngx_http_zstd_filter_module.git
+RUN git clone --depth=1 --branch ${NGX_ZSTD_VERSION} https://github.com/tokers/ngx_http_zstd_filter_module.git
 
-RUN git clone --depth=1 --branch ${NGX_GEOIP2_TAG} https://github.com/leev/ngx_http_geoip2_module.git
+RUN git clone --depth=1 --branch ${NGX_GEOIP2_VERSION} https://github.com/leev/ngx_http_geoip2_module.git
 
-RUN git clone --depth=1 --branch ${NGX_HEADERS_MORE_TAG} https://github.com/openresty/headers-more-nginx-module.git
+RUN git clone --depth=1 --branch ${NGX_HEADERS_MORE_VERSION} https://github.com/openresty/headers-more-nginx-module.git
 
 # Configure and build nginx
 WORKDIR /src/nginx
