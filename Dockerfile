@@ -35,7 +35,7 @@ RUN curl -fSL "https://github.com/cloudflare/quiche/archive/refs/tags/${QUICHE_V
     mv "quiche-${QUICHE_VERSION}" quiche && \
     cd quiche && \
     export PATH="$HOME/.cargo/bin:$PATH" && \
-    cargo build --release --no-default-features --features ffi,ssl
+    cargo build --release --no-default-features --features ffi,ssl --verbose
 
 # Download nginx
 RUN curl -fSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" -o nginx.tar.gz && \
