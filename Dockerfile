@@ -30,7 +30,7 @@ RUN apk add --no-cache \
 WORKDIR /src
 
 # Download and build quiche
-RUN curl -fSL "https://github.com/cloudflare/quiche/archive/refs/tags/${QUICHE_VERSION}.tar.gz" -o quiche.tar.gz && \
+RUN curl -fSL https://github.com/cloudflare/quiche/archive/refs/tags/${QUICHE_VERSION}.tar.gz -o quiche.tar.gz && \
     tar -zxC /src -f quiche.tar.gz && \
     mv "quiche-${QUICHE_VERSION}" quiche && \
     cd quiche && \
