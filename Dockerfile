@@ -23,7 +23,9 @@ RUN apk add --no-cache \
     zstd-dev \
     brotli-dev \
     perl-dev \
-    mercurial
+    mercurial \
+    rust \
+    cargo
 
 WORKDIR /src
 
