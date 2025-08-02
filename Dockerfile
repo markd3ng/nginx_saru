@@ -24,8 +24,8 @@ RUN apk add --no-cache \
     brotli-dev \
     perl-dev \
     mercurial \
-    rust \
-    cargo
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && source ~/.cargo/env
 
 WORKDIR /src
 
@@ -33,6 +33,8 @@ WORKDIR /src
 RUN git clone --depth=1 --recursive https://github.com/cloudflare/quiche.git && \
     cd quiche && \
     git checkout ${QUICHE_VERSION} && \
+    git submodule update --init --recursive && \
+    export PATH="$HOME/.cargo/bin:$PATH" && \
     cargo build --release --no-default-features --features ffi,ssl
 
 # Download nginx
@@ -111,6 +113,7 @@ RUN ./configure \
     --with-cc-opt="-I../quiche/include -I../quiche/deps/boringssl/include" \
     --with-ld-opt="-L../quiche/target/release -Wl,-rpath,/usr/local/lib" \
     --with-openssl=../quiche/deps/boringssl \
+    --with-quiche=../quiche \\
     --with-http_v3_module \
     --with-http_quic_module \
     --with-stream_quic_module \
